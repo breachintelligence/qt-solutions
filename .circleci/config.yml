@@ -38,10 +38,14 @@ jobs:
             sudo pip3 install awscli
       - reusable-setup
       - run:
+          name: Copy Qt from s3
+          command: mkdir Qt && cd Qt && aws s3 cp s3://polarityio-px-build/qt/qt-6.2.4-mac_x64.tgz . && tar zxf qt-6.2.4-mac_x64.tgz && rm qt-6.2.4-mac_x64.tgz
+      - run:
           name: Make build
           command: |
+            ls Qt/6.2.4
             cd qtsingleapplication/buildlib
-            qmake
+            ../../Qt/6.2.4/macos/bin/qmake
             make -j2
       - run:
           command: |
@@ -59,10 +63,18 @@ jobs:
     steps:
       - reusable-setup
       - run:
+          name: setup qt
+          command: |
+             mkdir -p Qt
+             aws s3 cp s3://polarityio-px-build/qt/qt-6.2.4-linux_x64.tgz Qt/
+             cd Qt/
+             tar zxvf qt-6.2.4-linux_x64.tgz
+      - run:
           name: Make build
           command: |
+            ls Qt/6.2.4
             cd qtsingleapplication/buildlib
-            qmake
+            ../../Qt/6.2.4/gcc_64/qmake
             make -j2
       - run:
           command: |
@@ -93,10 +105,21 @@ jobs:
             echo "${BUILD_VERSION}"
           shell: bash.exe
       - run:
+          command: |
+            pip install awscli
+            aws configure set aws_secret_access_key ${AWS_SECRET_ACCESS_KEY} --profile pxprod
+            aws configure set aws_access_key_id ${AWS_ACCESS_KEY_ID} --profile pxprod
+            aws configure set region us-east-1
+          shell: bash.exe
+      - run:
+          command: mkdir Qt && cd Qt && aws s3 cp s3://polarityio-px-build/qt/qt-6.2.4-win_x64.tgz . && tar zxvf qt-6.2.4-win_x64.tgz && rm qt-6.2.4-win_x64.tgz
+          shell: bash.exe
+      - run:
           name: Make build
           command: |
+            ls Qt/6.2.4
             cd qtsingleapplication/buildlib
-            qmake
+            ../../Qt/6.2.4/msvc2019_64/bin/qmake
             make -j2
       - run:
           command: |
