@@ -1,26 +1,163 @@
-# Use the latest 2.1 version of CircleCI pipeline process engine.
-# See: https://circleci.com/docs/2.0/configuration-reference
-version: 2.1
-
-# Define a job to be invoked later in a workflow.
-# See: https://circleci.com/docs/2.0/configuration-reference/#jobs
-jobs:
-  say-hello:
-    # Specify the execution environment. You can specify an image from Dockerhub or use one of our Convenience Images from CircleCI's Developer Hub.
-    # See: https://circleci.com/docs/2.0/configuration-reference/#docker-machine-macos-windows-executor
-    docker:
-      - image: cimg/base:stable
-    # Add steps to the job
-    # See: https://circleci.com/docs/2.0/configuration-reference/#steps
+commands:
+  reusable-setup:
     steps:
       - checkout
+      - attach_workspace:
+          at: /tmp/workspace
       - run:
-          name: "Say hello"
-          command: "echo Hello, World!"
+          command: |
+            export NYEAR=`date +%y`
+            export NMONTH=`date +%m`
+            export NDAY=`date +%d`
+            echo "export NYEAR=$NYEAR" >> $BASH_ENV
+            echo "export NMONTH=$NMONTH" >> $BASH_ENV
+            echo "export NDAY=$NDAY" >> $BASH_ENV
+      - run:
+          command: |
+            aws configure set aws_secret_access_key ${AWS_SECRET_ACCESS_KEY}
+            aws configure set aws_access_key_id ${AWS_ACCESS_KEY_ID}
+            aws configure set region us-east-1
+      - run:
+          name: set version number
+          command: |
+            echo "git version: $(git --version)"
+            echo "$(git log -1 --date=short --format=\"%ad\" | sed 's/-//g')-$(git rev-parse --short=8 HEAD)"
+            echo "export BUILD_VERSION=$(git log -1 --date=short --format=\"%ad\" | sed 's/-//g')-$(git rev-parse --short=8 HEAD)" >> $BASH_ENV ;\
 
-# Invoke jobs via workflows
-# See: https://circleci.com/docs/2.0/configuration-reference/#workflows
+
+version: 2.1
+jobs:
+  build-mac:
+    macos:
+      xcode: 12.5.1
+    steps:
+      - run:
+          name: Installing awscli
+          command: |
+            sudo pip3 install --upgrade pip
+            sudo pip3 install awscli
+      - reusable-setup
+      - run:
+          name: Make build
+          command: |
+            cd qtsingleapplication/buildlib
+            qmake
+            make -j2
+      - run:
+          command: |
+            cd qtsingleapplication
+            mv lib qtsingleapplication
+            tar zcvf qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz qtsingleapplication
+            shasum -a 256 qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz > qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz.sha256sum
+            echo aws s3 cp qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz
+            echo aws s3 cp qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz.sha256sum s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz.sha256sum
+
+  build-linux:
+    docker:
+        - image: 577326318091.dkr.ecr.us-east-1.amazonaws.com/polarity-aws-prod/px-build-centos7:latest
+    working_directory: ~/project
+    steps:
+      - reusable-setup
+      - run:
+          name: Make build
+          command: |
+            cd qtsingleapplication/buildlib
+            qmake
+            make -j2
+      - run:
+          command: |
+            cd build
+            tar zcvf qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz qtsingleapplication
+            sha256sum qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz > qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz.sha256sum
+            echo aws s3 cp qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz
+            echo aws s3 cp qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz.sha256sum s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz.sha256sum
+
+  build-win:
+    executor:
+      name: win/default
+    steps:
+      - checkout
+      - attach_workspace:
+          at: tmp
+      - run:
+          command: |
+            pip install awscli
+            aws configure set aws_secret_access_key ${AWS_SECRET_ACCESS_KEY} --profile pxprod
+            aws configure set aws_access_key_id ${AWS_ACCESS_KEY_ID} --profile pxprod
+            aws configure set region us-east-1
+          shell: bash.exe
+      - run:
+          name: set version number
+          command: |
+            echo "export BUILD_VERSION=$(git log -1 --date=short --format=\"%ad\" | sed 's/-//g')-$(git rev-parse --short=8 HEAD)" >> $BASH_ENV ;\
+            echo "${BUILD_VERSION}"
+          shell: bash.exe
+      - run:
+          name: Make build
+          command: |
+            cd qtsingleapplication/buildlib
+            qmake
+            make -j2
+      - run:
+          command: |
+             7z a qtsingleapplication-${BUILD_VERSION}-win-x64.zip qtsingleapplication
+             sha256sum qtsingleapplication-${BUILD_VERSION}-win-x64.zip > qtsingleapplication-${BUILD_VERSION}-win-x64.zip.sha256sum
+             echo aws s3 cp qtsingleapplication-${BUILD_VERSION}-win-x64.zip s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-win-x64.zip
+             echo aws s3 cp qtsingleapplication-${BUILD_VERSION}-win-x64.zip.sha256sum s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-win-x64.zip.sha256sum
+          shell: bash.exe
+
+  tag-and-slack:
+    parameters:
+      tag-commit:
+        type: boolean
+        default: true
+    docker:
+      - image: 577326318091.dkr.ecr.us-east-1.amazonaws.com/polarity-aws-prod/px-build-centos7:minimal
+    working_directory: ~/project
+    steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "ae:75:d7:9e:98:ed:9d:53:67:f4:7f:fb:09:36:92:5a"
+      - reusable-setup
+      - when:
+          condition: << parameters.tag-commit >>
+          steps:
+            - run:
+                name: tag version number
+                command: |
+                  git tag "$BUILD_VERSION"
+                  git push origin "$BUILD_VERSION"
+            - run:
+                name: slack it
+                command: |
+                  export POLARITY_NAME=QtSingleApplication
+                  export slackChannel="#qtsingleapplication-builds"
+                  curl -X POST --data-urlencode \
+                    "payload={                                                                                                                                \
+                        \"channel\": \"${slackChannel}\",                                                                                                     \
+                        \"username\": \"circleci\",                                                                                                           \
+                        \"text\": \"*${POLARITY_NAME} - ${CIRCLE_BRANCH}* \n(${CIRCLE_USERNAME} <${CIRCLE_BUILD_URL}|${CIRCLE_JOB}/${CIRCLE_BUILD_NUM}>) \n   \
+                          ${BUILD_VERSION} \n\
+                          *win-x64:* https://s3.console.aws.amazon.com/s3/object/polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-win-x64.zip  \n\
+                          *linux-x64:* https://s3.console.aws.amazon.com/s3/object/polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz \n\
+                          *darwin-x64:* https://s3.console.aws.amazon.com/s3/object/polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz  \n\
+                        \", \
+                        \"icon_emoji\": \":penguin-fugue:\" }" https://hooks.slack.com/services/${PX_SLACK_WEBHOOK}
+
+
 workflows:
-  say-hello-workflow:
+  build-release:
     jobs:
-      - say-hello
+      - build-linux
+      - build-win
+      - build-mac
+      - tag-and-slack:
+          requires:
+            - build-linux
+            - build-win
+            - build-mac
+
+
+orbs:
+  aws-s3: circleci/aws-s3@1.0.15
+  win: circleci/windows@2.2.0
