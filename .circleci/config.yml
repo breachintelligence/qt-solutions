@@ -78,7 +78,8 @@ jobs:
             make -j2
       - run:
           command: |
-            cd build
+            cd qtsingleapplication
+            mv lib qtsingleapplication
             tar zcvf qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz qtsingleapplication
             sha256sum qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz > qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz.sha256sum
             echo aws s3 cp qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz
@@ -123,10 +124,12 @@ jobs:
             make -j2
       - run:
           command: |
-             7z a qtsingleapplication-${BUILD_VERSION}-win-x64.zip qtsingleapplication
-             sha256sum qtsingleapplication-${BUILD_VERSION}-win-x64.zip > qtsingleapplication-${BUILD_VERSION}-win-x64.zip.sha256sum
-             echo aws s3 cp qtsingleapplication-${BUILD_VERSION}-win-x64.zip s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-win-x64.zip
-             echo aws s3 cp qtsingleapplication-${BUILD_VERSION}-win-x64.zip.sha256sum s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-win-x64.zip.sha256sum
+            cd qtsingleapplication
+            mv lib qtsingleapplication
+            7z a qtsingleapplication-${BUILD_VERSION}-win-x64.zip qtsingleapplication
+            sha256sum qtsingleapplication-${BUILD_VERSION}-win-x64.zip > qtsingleapplication-${BUILD_VERSION}-win-x64.zip.sha256sum
+            echo aws s3 cp qtsingleapplication-${BUILD_VERSION}-win-x64.zip s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-win-x64.zip
+            echo aws s3 cp qtsingleapplication-${BUILD_VERSION}-win-x64.zip.sha256sum s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-win-x64.zip.sha256sum
           shell: bash.exe
 
   tag-and-slack:
