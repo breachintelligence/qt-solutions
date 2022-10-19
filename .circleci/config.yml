@@ -43,9 +43,9 @@ jobs:
       - run:
           name: Make build
           command: |
-            ls Qt/6.2.4
+            export PATH=$PWD/Qt/6.2.4/macos/bin:$PATH
             cd qtsingleapplication/buildlib
-            ../../Qt/6.2.4/macos/bin/qmake
+            qmake
             make -j2
       - run:
           command: |
@@ -72,9 +72,9 @@ jobs:
       - run:
           name: Make build
           command: |
-            ls Qt/6.2.4
+            export PATH=$PWD/Qt/6.2.4/gcc_64/bin:$PATH
             cd qtsingleapplication/buildlib
-            ../../Qt/6.2.4/gcc_64/bin/qmake
+            qmake
             make -j2
       - run:
           command: |
@@ -118,9 +118,9 @@ jobs:
       - run:
           name: Make build
           command: |
-            ls Qt/6.2.4
+            export PATH=$PWD/Qt/6.2.4/msvc2019_64/bin:$PATH
             cd qtsingleapplication/buildlib
-            ../../Qt/6.2.4/msvc2019_64/bin/qmake
+            qmake
             make -j2
           shell: bash.exe
       - run:
