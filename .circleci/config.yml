@@ -74,7 +74,7 @@ jobs:
           command: |
             ls Qt/6.2.4
             cd qtsingleapplication/buildlib
-            ../../Qt/6.2.4/gcc_64/qmake
+            ../../Qt/6.2.4/gcc_64/bin/qmake
             make -j2
       - run:
           command: |
@@ -122,6 +122,7 @@ jobs:
             cd qtsingleapplication/buildlib
             ../../Qt/6.2.4/msvc2019_64/bin/qmake
             make -j2
+          shell: bash.exe
       - run:
           command: |
             cd qtsingleapplication
