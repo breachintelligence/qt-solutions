@@ -146,7 +146,7 @@ jobs:
         type: boolean
         default: true
     docker:
-      - image: 577326318091.dkr.ecr.us-east-1.amazonaws.com/polarity-aws-prod/px-build-centos8:minimal
+      - image: 577326318091.dkr.ecr.us-east-1.amazonaws.com/polarity-aws-prod/px-build-centos7:minimal
     working_directory: ~/project
     steps:
       - add_ssh_keys:
