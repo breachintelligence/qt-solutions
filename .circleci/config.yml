@@ -116,12 +116,16 @@ jobs:
           command: mkdir Qt && cd Qt && aws s3 cp s3://polarityio-px-build/qt/qt-6.2.4-win_x64.tgz . && tar zxvf qt-6.2.4-win_x64.tgz && rm qt-6.2.4-win_x64.tgz
           shell: bash.exe
       - run:
+          command: aws s3 cp s3://polarityio-px-build/3.3.0/win/deps/jom.zip . && unzip jom.zip && rm jom.zip
+          shell: bash.exe
+      - run:
           command: |
              echo 'call C:\"Program Files (x86)"\"Microsoft Visual Studio"\2019\Community\VC\Auxiliary\Build\vcvarsall.bat x64 -vcvars_ver=14.2' >> build.bat
-             echo 'set PATH=%CD%\Qt\6.2.4\msvc2019_64\bin;%PATH%' >> build.bat
+             echo 'set PATH=%CD%\jom;%CD%\Qt\6.2.4\msvc2019_64\bin;%PATH%' >> build.bat
              echo 'cd qtsingleapplication/buildlib' >> build.bat
              echo "qmake CONFIG+=release" >> build.bat
              echo 'make -j 2' >> build.bat
+             echo 'jom -j3' >> build.bat
           shell: bash.exe
       - run:
           command: build.bat
@@ -142,7 +146,7 @@ jobs:
         type: boolean
         default: true
     docker:
-      - image: 577326318091.dkr.ecr.us-east-1.amazonaws.com/polarity-aws-prod/px-build-centos7:minimal
+      - image: 577326318091.dkr.ecr.us-east-1.amazonaws.com/polarity-aws-prod/px-build-centos8:minimal
     working_directory: ~/project
     steps:
       - add_ssh_keys:
