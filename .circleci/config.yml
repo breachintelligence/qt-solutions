@@ -58,7 +58,7 @@ jobs:
 
   build-linux:
     docker:
-        - image: 577326318091.dkr.ecr.us-east-1.amazonaws.com/polarity-aws-prod/px-build-centos7:latest
+        - image: 577326318091.dkr.ecr.us-east-1.amazonaws.com/polarity-aws-prod/px-build-centos8:latest
     working_directory: ~/project
     steps:
       - reusable-setup
@@ -116,13 +116,16 @@ jobs:
           command: mkdir Qt && cd Qt && aws s3 cp s3://polarityio-px-build/qt/qt-6.2.4-win_x64.tgz . && tar zxvf qt-6.2.4-win_x64.tgz && rm qt-6.2.4-win_x64.tgz
           shell: bash.exe
       - run:
-          name: Make build
           command: |
-            export PATH=$PWD/Qt/6.2.4/msvc2019_64/bin:$PATH
-            cd qtsingleapplication/buildlib
-            qmake
-            make -j2
+             echo 'call C:\"Program Files (x86)"\"Microsoft Visual Studio"\2019\Community\VC\Auxiliary\Build\vcvarsall.bat x64 -vcvars_ver=14.2' >> build.bat
+             echo 'set PATH=%CD%\Qt\6.2.4\msvc2019_64\bin;%PATH%' >> build.bat
+             echo 'cd qtsingleapplication/buildlib' >> build.bat
+             echo "qmake CONFIG+=release" >> build.bat
+             echo 'make -j 2' >> build.bat
           shell: bash.exe
+      - run:
+          command: build.bat
+          shell: cmd.exe
       - run:
           command: |
             cd qtsingleapplication
