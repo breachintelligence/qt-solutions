@@ -51,7 +51,9 @@ jobs:
           command: |
             cd qtsingleapplication
             mv lib qtsingleapplication
-            tar zcvf qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz qtsingleapplication
+            mkdir include
+            cp src/qtsingleapplication.h include/
+            tar zcvf qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz qtsingleapplication include
             shasum -a 256 qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz > qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz.sha256sum
             aws s3 cp qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz
             aws s3 cp qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz.sha256sum s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz.sha256sum
@@ -80,7 +82,9 @@ jobs:
           command: |
             cd qtsingleapplication
             mv lib qtsingleapplication
-            tar zcvf qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz qtsingleapplication
+            mkdir include
+            cp src/qtsingleapplication.h include/
+            tar zcvf qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz qtsingleapplication include
             sha256sum qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz > qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz.sha256sum
             aws s3 cp qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz
             aws s3 cp qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz.sha256sum s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz.sha256sum
@@ -134,7 +138,9 @@ jobs:
           command: |
             cd qtsingleapplication
             mv lib qtsingleapplication
-            7z a qtsingleapplication-${BUILD_VERSION}-win-x64.zip qtsingleapplication
+            mkdir include
+            cp src/qtsingleapplication.h include/
+            7z a qtsingleapplication-${BUILD_VERSION}-win-x64.zip qtsingleapplication include
             sha256sum qtsingleapplication-${BUILD_VERSION}-win-x64.zip > qtsingleapplication-${BUILD_VERSION}-win-x64.zip.sha256sum
             aws s3 cp qtsingleapplication-${BUILD_VERSION}-win-x64.zip s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-win-x64.zip
             aws s3 cp qtsingleapplication-${BUILD_VERSION}-win-x64.zip.sha256sum s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-win-x64.zip.sha256sum
