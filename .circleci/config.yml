@@ -160,7 +160,7 @@ jobs:
     steps:
       - add_ssh_keys:
           fingerprints:
-            - "ae:75:d7:9e:98:ed:9d:53:67:f4:7f:fb:09:36:92:5a"
+            - "96:e4:e2:a9:22:f7:4d:57:17:62:7c:e4:1f:f5:40:2c"
       - reusable-setup
       - when:
           condition: << parameters.tag-commit >>
