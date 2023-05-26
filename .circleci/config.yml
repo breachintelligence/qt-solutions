@@ -59,6 +59,41 @@ jobs:
             aws s3 cp qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz
             aws s3 cp qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz.sha256sum s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz.sha256sum
 
+  build-mac-arm:
+    macos:
+      xcode: 14.2.0
+    resource_class: macos.m1.large.gen1
+    environment:
+      HOMEBREW_NO_AUTO_UPDATE: 1
+    steps:
+      - run:
+          name: Installing awscli
+          command: |
+            pip3 install --upgrade pip
+            pip3 install awscli
+      - reusable-setup
+      - run:
+          name: Copy Qt from s3
+          command: mkdir Qt && cd Qt && aws s3 cp s3://polarityio-px-build/qt/qt-6.2.4-mac_x64.tgz . && tar zxf qt-6.2.4-mac_x64.tgz && rm qt-6.2.4-mac_x64.tgz
+      - run:
+          name: Make build
+          command: |
+            export PATH=$PWD/Qt/6.2.4/macos/bin:$PATH
+            cd qtsingleapplication/buildlib
+            qmake
+            make -j8
+      - run:
+          command: |
+            cd qtsingleapplication
+            mv lib qtsingleapplication
+            mkdir include
+            cp src/*.h include/
+            cp src/QtSingleApplication include/
+            tar zcvf qtsingleapplication-${BUILD_VERSION}-darwin-arm64.tgz qtsingleapplication include
+            shasum -a 256 qtsingleapplication-${BUILD_VERSION}-darwin-arm64.tgz > qtsingleapplication-${BUILD_VERSION}-darwin-arm64.tgz.sha256sum
+            aws s3 cp qtsingleapplication-${BUILD_VERSION}-darwin-arm64.tgz s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-darwin-arm64.tgz
+            aws s3 cp qtsingleapplication-${BUILD_VERSION}-darwin-arm64.tgz.sha256sum s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-darwin-arm64.tgz.sha256sum
+
   build-linux:
     docker:
         - image: 577326318091.dkr.ecr.us-east-1.amazonaws.com/polarity-aws-prod/px-build-centos8:latest
@@ -194,6 +229,7 @@ workflows:
       - build-linux
       - build-win
       - build-mac
+      - build-mac-arm
       - tag-and-slack:
           requires:
             - build-linux
