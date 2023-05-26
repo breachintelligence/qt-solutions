@@ -1,6 +1,9 @@
 commands:
   reusable-setup:
     steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "$GLADOS_SSH_FINGERPRINT"
       - checkout
       - attach_workspace:
           at: /tmp/workspace
@@ -130,6 +133,9 @@ jobs:
     executor:
       name: win/default
     steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "$GLADOS_SSH_FINGERPRINT"
       - checkout
       - attach_workspace:
           at: tmp
@@ -226,11 +232,21 @@ jobs:
 workflows:
   build-release:
     jobs:
-      - build-linux
-      - build-win
-      - build-mac
-      - build-mac-arm
+      - build-linux:
+          context:
+            -glados
+      - build-win:
+          context:
+            -glados
+      - build-mac:
+          context:
+            -glados
+      - build-mac-arm:
+          context:
+            -glados
       - tag-and-slack:
+          context:
+            -glados
           requires:
             - build-linux
             - build-win
