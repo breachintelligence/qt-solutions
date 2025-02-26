@@ -32,6 +32,7 @@ jobs:
     build-mac:
         macos:
             xcode: 12.5.1
+        resource_class: macos.m1.large.gen1
         steps:
             - run:
                   name: Installing awscli
@@ -231,23 +232,23 @@ workflows:
     build-release:
         jobs:
             - build-linux:
-                  context: 
+                  context:
                       - glados
                       - circleci-aws-dev
             - build-win:
-                  context: 
+                  context:
                       - glados
                       - circleci-aws-dev
             - build-mac:
-                  context: 
+                  context:
                       - glados
                       - circleci-aws-dev
             - build-mac-arm:
-                  context: 
+                  context:
                       - glados
                       - circleci-aws-dev
             - tag-and-slack:
-                  context: 
+                  context:
                       - glados
                       - circleci-aws-dev
                   requires:
