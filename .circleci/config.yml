@@ -1,258 +1,260 @@
 commands:
-  reusable-setup:
-    steps:
-      - add_ssh_keys:
-          fingerprints:
-            - "$GLADOS_SSH_FINGERPRINT"
-      - checkout
-      - attach_workspace:
-          at: /tmp/workspace
-      - run:
-          command: |
-            export NYEAR=`date +%y`
-            export NMONTH=`date +%m`
-            export NDAY=`date +%d`
-            echo "export NYEAR=$NYEAR" >> $BASH_ENV
-            echo "export NMONTH=$NMONTH" >> $BASH_ENV
-            echo "export NDAY=$NDAY" >> $BASH_ENV
-      - run:
-          command: |
-            aws configure set aws_secret_access_key ${AWS_SECRET_ACCESS_KEY}
-            aws configure set aws_access_key_id ${AWS_ACCESS_KEY_ID}
-            aws configure set region us-east-1
-      - run:
-          name: set version number
-          command: |
-            echo "git version: $(git --version)"
-            echo "$(git log -1 --date=short --format=\"%ad\" | sed 's/-//g')-$(git rev-parse --short=8 HEAD)"
-            echo "export BUILD_VERSION=$(git log -1 --date=short --format=\"%ad\" | sed 's/-//g')-$(git rev-parse --short=8 HEAD)" >> $BASH_ENV ;\
-
+    reusable-setup:
+        steps:
+            - add_ssh_keys:
+                  fingerprints:
+                      - "$GLADOS_SSH_FINGERPRINT"
+            - checkout
+            - attach_workspace:
+                  at: /tmp/workspace
+            - run:
+                  command: |
+                      export NYEAR=`date +%y`
+                      export NMONTH=`date +%m`
+                      export NDAY=`date +%d`
+                      echo "export NYEAR=$NYEAR" >> $BASH_ENV
+                      echo "export NMONTH=$NMONTH" >> $BASH_ENV
+                      echo "export NDAY=$NDAY" >> $BASH_ENV
+            - run:
+                  command: |
+                      aws configure set aws_secret_access_key ${AWS_SECRET_ACCESS_KEY}
+                      aws configure set aws_access_key_id ${AWS_ACCESS_KEY_ID}
+                      aws configure set region us-east-1
+            - run:
+                  name: set version number
+                  command: |
+                      echo "git version: $(git --version)"
+                      echo "$(git log -1 --date=short --format=\"%ad\" | sed 's/-//g')-$(git rev-parse --short=8 HEAD)"
+                      echo "export BUILD_VERSION=$(git log -1 --date=short --format=\"%ad\" | sed 's/-//g')-$(git rev-parse --short=8 HEAD)" >> $BASH_ENV ;\
 
 version: 2.1
 jobs:
-  build-mac:
-    macos:
-      xcode: 12.5.1
-    steps:
-      - run:
-          name: Installing awscli
-          command: |
-            sudo pip3 install --upgrade pip
-            sudo pip3 install awscli
-      - reusable-setup
-      - run:
-          name: Copy Qt from s3
-          command: mkdir Qt && cd Qt && aws s3 cp s3://polarityio-px-build/qt/qt-6.2.4-mac_x64.tgz . && tar zxf qt-6.2.4-mac_x64.tgz && rm qt-6.2.4-mac_x64.tgz
-      - run:
-          name: Make build
-          command: |
-            export PATH=$PWD/Qt/6.2.4/macos/bin:$PATH
-            cd qtsingleapplication/buildlib
-            qmake
-            make -j2
-      - run:
-          command: |
-            cd qtsingleapplication
-            mv lib qtsingleapplication
-            mkdir include
-            cp src/*.h include/
-            cp src/QtSingleApplication include/
-            tar zcvf qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz qtsingleapplication include
-            shasum -a 256 qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz > qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz.sha256sum
-            aws s3 cp qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz
-            aws s3 cp qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz.sha256sum s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz.sha256sum
-
-  build-mac-arm:
-    macos:
-      xcode: 14.2.0
-    resource_class: macos.m1.large.gen1
-    environment:
-      HOMEBREW_NO_AUTO_UPDATE: 1
-    steps:
-      - run:
-          name: Installing awscli
-          command: |
-            pip3 install --upgrade pip
-            pip3 install awscli
-      - reusable-setup
-      - run:
-          name: Copy Qt from s3
-          command: mkdir Qt && cd Qt && aws s3 cp s3://polarityio-px-build/qt/qt-6.2.4-mac_x64.tgz . && tar zxf qt-6.2.4-mac_x64.tgz && rm qt-6.2.4-mac_x64.tgz
-      - run:
-          name: Make build
-          command: |
-            export PATH=$PWD/Qt/6.2.4/macos/bin:$PATH
-            cd qtsingleapplication/buildlib
-            qmake
-            make -j8
-      - run:
-          command: |
-            cd qtsingleapplication
-            mv lib qtsingleapplication
-            mkdir include
-            cp src/*.h include/
-            cp src/QtSingleApplication include/
-            tar zcvf qtsingleapplication-${BUILD_VERSION}-darwin-arm64.tgz qtsingleapplication include
-            shasum -a 256 qtsingleapplication-${BUILD_VERSION}-darwin-arm64.tgz > qtsingleapplication-${BUILD_VERSION}-darwin-arm64.tgz.sha256sum
-            aws s3 cp qtsingleapplication-${BUILD_VERSION}-darwin-arm64.tgz s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-darwin-arm64.tgz
-            aws s3 cp qtsingleapplication-${BUILD_VERSION}-darwin-arm64.tgz.sha256sum s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-darwin-arm64.tgz.sha256sum
-
-  build-linux:
-    docker:
-        - image: 577326318091.dkr.ecr.us-east-1.amazonaws.com/polarity-aws-prod/px-build-centos8:latest
-    working_directory: ~/project
-    steps:
-      - reusable-setup
-      - run:
-          name: setup qt
-          command: |
-             mkdir -p Qt
-             aws s3 cp s3://polarityio-px-build/qt/qt-6.2.4-linux_x64.tgz Qt/
-             cd Qt/
-             tar zxvf qt-6.2.4-linux_x64.tgz
-      - run:
-          name: Make build
-          command: |
-            export PATH=$PWD/Qt/6.2.4/gcc_64/bin:$PATH
-            cd qtsingleapplication/buildlib
-            qmake
-            make -j2
-      - run:
-          command: |
-            cd qtsingleapplication
-            mv lib qtsingleapplication
-            mkdir include
-            cp src/*.h include/
-            cp src/QtSingleApplication include/
-            tar zcvf qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz qtsingleapplication include
-            sha256sum qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz > qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz.sha256sum
-            aws s3 cp qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz
-            aws s3 cp qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz.sha256sum s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz.sha256sum
-
-  build-win:
-    executor:
-      name: win/default
-    steps:
-      - add_ssh_keys:
-          fingerprints:
-            - "$GLADOS_SSH_FINGERPRINT"
-      - checkout
-      - attach_workspace:
-          at: tmp
-      - run:
-          command: |
-            pip install awscli
-            aws configure set aws_secret_access_key ${AWS_SECRET_ACCESS_KEY} --profile pxprod
-            aws configure set aws_access_key_id ${AWS_ACCESS_KEY_ID} --profile pxprod
-            aws configure set region us-east-1
-          shell: bash.exe
-      - run:
-          name: set version number
-          command: |
-            echo "export BUILD_VERSION=$(git log -1 --date=short --format=\"%ad\" | sed 's/-//g')-$(git rev-parse --short=8 HEAD)" >> $BASH_ENV ;\
-            echo "${BUILD_VERSION}"
-          shell: bash.exe
-      - run:
-          command: |
-            pip install awscli
-            aws configure set aws_secret_access_key ${AWS_SECRET_ACCESS_KEY} --profile pxprod
-            aws configure set aws_access_key_id ${AWS_ACCESS_KEY_ID} --profile pxprod
-            aws configure set region us-east-1
-          shell: bash.exe
-      - run:
-          command: mkdir Qt && cd Qt && aws s3 cp s3://polarityio-px-build/qt/qt-6.2.4-win_x64.tgz . && tar zxvf qt-6.2.4-win_x64.tgz && rm qt-6.2.4-win_x64.tgz
-          shell: bash.exe
-      - run:
-          command: aws s3 cp s3://polarityio-px-build/3.3.0/win/deps/jom.zip . && unzip jom.zip && rm jom.zip
-          shell: bash.exe
-      - run:
-          command: |
-             echo 'call C:\"Program Files (x86)"\"Microsoft Visual Studio"\2019\Community\VC\Auxiliary\Build\vcvarsall.bat x64 -vcvars_ver=14.2' >> build.bat
-             echo 'set PATH=%CD%\jom;%CD%\Qt\6.2.4\msvc2019_64\bin;%PATH%' >> build.bat
-             echo 'cd qtsingleapplication/buildlib' >> build.bat
-             echo "qmake CONFIG+=release" >> build.bat
-             echo 'make -j 2' >> build.bat
-             echo 'jom -j3' >> build.bat
-          shell: bash.exe
-      - run:
-          command: build.bat
-          shell: cmd.exe
-      - run:
-          command: |
-            cd qtsingleapplication
-            mv lib qtsingleapplication
-            mkdir include
-            cp src/*.h include/
-            cp src/QtSingleApplication include/
-            7z a qtsingleapplication-${BUILD_VERSION}-win-x64.zip qtsingleapplication include
-            sha256sum qtsingleapplication-${BUILD_VERSION}-win-x64.zip > qtsingleapplication-${BUILD_VERSION}-win-x64.zip.sha256sum
-            aws s3 cp qtsingleapplication-${BUILD_VERSION}-win-x64.zip s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-win-x64.zip
-            aws s3 cp qtsingleapplication-${BUILD_VERSION}-win-x64.zip.sha256sum s3://polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-win-x64.zip.sha256sum
-          shell: bash.exe
-
-  tag-and-slack:
-    parameters:
-      tag-commit:
-        type: boolean
-        default: true
-    docker:
-      - image: 577326318091.dkr.ecr.us-east-1.amazonaws.com/polarity-aws-prod/px-build-centos7:minimal
-    working_directory: ~/project
-    steps:
-      - add_ssh_keys:
-          fingerprints:
-            - "96:e4:e2:a9:22:f7:4d:57:17:62:7c:e4:1f:f5:40:2c"
-      - reusable-setup
-      - when:
-          condition: << parameters.tag-commit >>
-          steps:
+    build-mac:
+        macos:
+            xcode: 12.5.1
+        steps:
             - run:
-                name: tag version number
-                command: |
-                  git tag "$BUILD_VERSION"
-                  git push origin "$BUILD_VERSION"
+                  name: Installing awscli
+                  command: |
+                      sudo pip3 install --upgrade pip
+                      sudo pip3 install awscli
+            - reusable-setup
             - run:
-                name: slack it
-                command: |
-                  export POLARITY_NAME=QtSingleApplication
-                  export slackChannel="#qtsingleapplication-builds"
-                  curl -X POST --data-urlencode \
-                    "payload={                                                                                                                                \
-                        \"channel\": \"${slackChannel}\",                                                                                                     \
-                        \"username\": \"circleci\",                                                                                                           \
-                        \"text\": \"*${POLARITY_NAME} - ${CIRCLE_BRANCH}* \n(${CIRCLE_USERNAME} <${CIRCLE_BUILD_URL}|${CIRCLE_JOB}/${CIRCLE_BUILD_NUM}>) \n   \
-                          ${BUILD_VERSION} \n\
-                          *win-x64:* https://s3.console.aws.amazon.com/s3/object/polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-win-x64.zip  \n\
-                          *linux-x64:* https://s3.console.aws.amazon.com/s3/object/polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz \n\
-                          *darwin-x64:* https://s3.console.aws.amazon.com/s3/object/polarityio-prod-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz  \n\
-                        \", \
-                        \"icon_emoji\": \":penguin-fugue:\" }" https://hooks.slack.com/services/${PX_SLACK_WEBHOOK}
+                  name: Copy Qt from s3
+                  command: mkdir Qt && cd Qt && aws s3 cp s3://polarity-px-build/qt/qt-6.2.4-mac_x64.tgz . && tar zxf qt-6.2.4-mac_x64.tgz && rm qt-6.2.4-mac_x64.tgz
+            - run:
+                  name: Make build
+                  command: |
+                      export PATH=$PWD/Qt/6.2.4/macos/bin:$PATH
+                      cd qtsingleapplication/buildlib
+                      qmake
+                      make -j2
+            - run:
+                  command: |
+                      cd qtsingleapplication
+                      mv lib qtsingleapplication
+                      mkdir include
+                      cp src/*.h include/
+                      cp src/QtSingleApplication include/
+                      tar zcvf qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz qtsingleapplication include
+                      shasum -a 256 qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz > qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz.sha256sum
+                      aws s3 cp qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz s3://polarityio-dev-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz
+                      aws s3 cp qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz.sha256sum s3://polarityio-dev-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz.sha256sum
 
+    build-mac-arm:
+        macos:
+            xcode: 14.2.0
+        resource_class: macos.m1.large.gen1
+        environment:
+            HOMEBREW_NO_AUTO_UPDATE: 1
+        steps:
+            - run:
+                  name: Installing awscli
+                  command: |
+                      pip3 install --upgrade pip
+                      pip3 install awscli
+            - reusable-setup
+            - run:
+                  name: Copy Qt from s3
+                  command: mkdir Qt && cd Qt && aws s3 cp s3://polarity-px-build/qt/qt-6.2.4-mac_x64.tgz . && tar zxf qt-6.2.4-mac_x64.tgz && rm qt-6.2.4-mac_x64.tgz
+            - run:
+                  name: Make build
+                  command: |
+                      export PATH=$PWD/Qt/6.2.4/macos/bin:$PATH
+                      cd qtsingleapplication/buildlib
+                      qmake
+                      make -j8
+            - run:
+                  command: |
+                      cd qtsingleapplication
+                      mv lib qtsingleapplication
+                      mkdir include
+                      cp src/*.h include/
+                      cp src/QtSingleApplication include/
+                      tar zcvf qtsingleapplication-${BUILD_VERSION}-darwin-arm64.tgz qtsingleapplication include
+                      shasum -a 256 qtsingleapplication-${BUILD_VERSION}-darwin-arm64.tgz > qtsingleapplication-${BUILD_VERSION}-darwin-arm64.tgz.sha256sum
+                      aws s3 cp qtsingleapplication-${BUILD_VERSION}-darwin-arm64.tgz s3://polarityio-dev-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-darwin-arm64.tgz
+                      aws s3 cp qtsingleapplication-${BUILD_VERSION}-darwin-arm64.tgz.sha256sum s3://polarityio-dev-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-darwin-arm64.tgz.sha256sum
+
+    build-linux:
+        docker:
+            - image: 623071050687.dkr.ecr.us-east-1.amazonaws.com/polarity-aws-dev/px-build-centos8:latest
+        working_directory: ~/project
+        steps:
+            - reusable-setup
+            - run:
+                  name: setup qt
+                  command: |
+                      mkdir -p Qt
+                      aws s3 cp s3://polarity-px-build/qt/qt-6.2.4-linux_x64.tgz Qt/
+                      cd Qt/
+                      tar zxvf qt-6.2.4-linux_x64.tgz
+            - run:
+                  name: Make build
+                  command: |
+                      export PATH=$PWD/Qt/6.2.4/gcc_64/bin:$PATH
+                      cd qtsingleapplication/buildlib
+                      qmake
+                      make -j2
+            - run:
+                  command: |
+                      cd qtsingleapplication
+                      mv lib qtsingleapplication
+                      mkdir include
+                      cp src/*.h include/
+                      cp src/QtSingleApplication include/
+                      tar zcvf qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz qtsingleapplication include
+                      sha256sum qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz > qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz.sha256sum
+                      aws s3 cp qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz s3://polarityio-dev-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz
+                      aws s3 cp qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz.sha256sum s3://polarityio-dev-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz.sha256sum
+
+    build-win:
+        executor:
+            name: win/default
+        steps:
+            - add_ssh_keys:
+                  fingerprints:
+                      - "$GLADOS_SSH_FINGERPRINT"
+            - checkout
+            - attach_workspace:
+                  at: tmp
+            - run:
+                  command: |
+                      pip install awscli
+                      aws configure set aws_secret_access_key ${AWS_SECRET_ACCESS_KEY} --profile pxprod
+                      aws configure set aws_access_key_id ${AWS_ACCESS_KEY_ID} --profile pxprod
+                      aws configure set region us-east-1
+                  shell: bash.exe
+            - run:
+                  name: set version number
+                  command: |
+                      echo "export BUILD_VERSION=$(git log -1 --date=short --format=\"%ad\" | sed 's/-//g')-$(git rev-parse --short=8 HEAD)" >> $BASH_ENV ;\
+                      echo "${BUILD_VERSION}"
+                  shell: bash.exe
+            - run:
+                  command: |
+                      pip install awscli
+                      aws configure set aws_secret_access_key ${AWS_SECRET_ACCESS_KEY} --profile pxprod
+                      aws configure set aws_access_key_id ${AWS_ACCESS_KEY_ID} --profile pxprod
+                      aws configure set region us-east-1
+                  shell: bash.exe
+            - run:
+                  command: mkdir Qt && cd Qt && aws s3 cp s3://polarity-px-build/qt/qt-6.2.4-win_x64.tgz . && tar zxvf qt-6.2.4-win_x64.tgz && rm qt-6.2.4-win_x64.tgz
+                  shell: bash.exe
+            - run:
+                  command: aws s3 cp s3://polarity-px-build/3.3.0/win/deps/jom.zip . && unzip jom.zip && rm jom.zip
+                  shell: bash.exe
+            - run:
+                  command: |
+                      echo 'call C:\"Program Files (x86)"\"Microsoft Visual Studio"\2019\Community\VC\Auxiliary\Build\vcvarsall.bat x64 -vcvars_ver=14.2' >> build.bat
+                      echo 'set PATH=%CD%\jom;%CD%\Qt\6.2.4\msvc2019_64\bin;%PATH%' >> build.bat
+                      echo 'cd qtsingleapplication/buildlib' >> build.bat
+                      echo "qmake CONFIG+=release" >> build.bat
+                      echo 'make -j 2' >> build.bat
+                      echo 'jom -j3' >> build.bat
+                  shell: bash.exe
+            - run:
+                  command: build.bat
+                  shell: cmd.exe
+            - run:
+                  command: |
+                      cd qtsingleapplication
+                      mv lib qtsingleapplication
+                      mkdir include
+                      cp src/*.h include/
+                      cp src/QtSingleApplication include/
+                      7z a qtsingleapplication-${BUILD_VERSION}-win-x64.zip qtsingleapplication include
+                      sha256sum qtsingleapplication-${BUILD_VERSION}-win-x64.zip > qtsingleapplication-${BUILD_VERSION}-win-x64.zip.sha256sum
+                      aws s3 cp qtsingleapplication-${BUILD_VERSION}-win-x64.zip s3://polarityio-dev-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-win-x64.zip
+                      aws s3 cp qtsingleapplication-${BUILD_VERSION}-win-x64.zip.sha256sum s3://polarityio-dev-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-win-x64.zip.sha256sum
+                  shell: bash.exe
+
+    tag-and-slack:
+        parameters:
+            tag-commit:
+                type: boolean
+                default: true
+        docker:
+            - image: 623071050687.dkr.ecr.us-east-1.amazonaws.com/polarity-aws-prod/px-build-centos8:latest
+        working_directory: ~/project
+        steps:
+            - add_ssh_keys:
+                  fingerprints:
+                      - "96:e4:e2:a9:22:f7:4d:57:17:62:7c:e4:1f:f5:40:2c"
+            - reusable-setup
+            - when:
+                  condition: << parameters.tag-commit >>
+                  steps:
+                      - run:
+                            name: tag version number
+                            command: |
+                                git tag "$BUILD_VERSION"
+                                git push origin "$BUILD_VERSION"
+                      - run:
+                            name: slack it
+                            command: |
+                                export POLARITY_NAME=QtSingleApplication
+                                export slackChannel="#qtsingleapplication-builds"
+                                curl -X POST --data-urlencode \
+                                  "payload={                                                                                                                                \
+                                      \"channel\": \"${slackChannel}\",                                                                                                     \
+                                      \"username\": \"circleci\",                                                                                                           \
+                                      \"text\": \"*${POLARITY_NAME} - ${CIRCLE_BRANCH}* \n(${CIRCLE_USERNAME} <${CIRCLE_BUILD_URL}|${CIRCLE_JOB}/${CIRCLE_BUILD_NUM}>) \n   \
+                                        ${BUILD_VERSION} \n\
+                                        *win-x64:* https://s3.console.aws.amazon.com/s3/object/polarityio-dev-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-win-x64.zip  \n\
+                                        *linux-x64:* https://s3.console.aws.amazon.com/s3/object/polarityio-dev-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz \n\
+                                        *darwin-x64:* https://s3.console.aws.amazon.com/s3/object/polarityio-dev-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz  \n\
+                                      \", \
+                                      \"icon_emoji\": \":penguin-fugue:\" }" https://hooks.slack.com/services/${PX_SLACK_WEBHOOK}
 
 workflows:
-  build-release:
-    jobs:
-      - build-linux:
-          context:
-            -glados
-      - build-win:
-          context:
-            -glados
-      - build-mac:
-          context:
-            -glados
-      - build-mac-arm:
-          context:
-            -glados
-      - tag-and-slack:
-          context:
-            -glados
-          requires:
-            - build-linux
-            - build-win
-            - build-mac
-
+    build-release:
+        jobs:
+            - build-linux:
+                  context: 
+                      - glados
+                      - circleci-aws-dev
+            - build-win:
+                  context: 
+                      - glados
+                      - circleci-aws-dev
+            - build-mac:
+                  context: 
+                      - glados
+                      - circleci-aws-dev
+            - build-mac-arm:
+                  context: 
+                      - glados
+                      - circleci-aws-dev
+            - tag-and-slack:
+                  context: 
+                      - glados
+                      - circleci-aws-dev
+                  requires:
+                      - build-linux
+                      - build-win
+                      - build-mac
 
 orbs:
-  aws-s3: circleci/aws-s3@1.0.15
-  win: circleci/windows@2.2.0
+    aws-s3: circleci/aws-s3@1.0.15
+    win: circleci/windows@2.2.0
