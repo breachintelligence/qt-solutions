@@ -218,6 +218,7 @@ jobs:
                                 export slackChannel="#qtsingleapplication-builds"
                                 curl --location --request POST 'https://slack.com/api/chat.postMessage' \
                                      -H "Authorization: Bearer ${SLACK_BOT_TOKEN}" \
+                                     --header "Content-Type: application/json" \
                                      --data-raw "{                                                                                                                                \
                                       \"channel\": \"${slackChannel}\",                                                                                                     \
                                       \"username\": \"circleci\",                                                                                                           \
