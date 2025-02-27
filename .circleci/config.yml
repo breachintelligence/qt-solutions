@@ -201,7 +201,7 @@ jobs:
         steps:
             - add_ssh_keys:
                   fingerprints:
-                      - "96:e4:e2:a9:22:f7:4d:57:17:62:7c:e4:1f:f5:40:2c"
+                      - "$GLADOS_SSH_FINGERPRINT"
             - reusable-setup
             - when:
                   condition: << parameters.tag-commit >>
@@ -216,8 +216,9 @@ jobs:
                             command: |
                                 export POLARITY_NAME=QtSingleApplication
                                 export slackChannel="#qtsingleapplication-builds"
-                                curl -X POST --data-urlencode \
-                                  "payload={                                                                                                                                \
+                                curl --location --request POST 'https://slack.com/api/chat.postMessage' \
+                                     -H "Authorization: Bearer ${SLACK_BOT_TOKEN}" \
+                                     --data-raw "{                                                                                                                                \
                                       \"channel\": \"${slackChannel}\",                                                                                                     \
                                       \"username\": \"circleci\",                                                                                                           \
                                       \"text\": \"*${POLARITY_NAME} - ${CIRCLE_BRANCH}* \n(${CIRCLE_USERNAME} <${CIRCLE_BUILD_URL}|${CIRCLE_JOB}/${CIRCLE_BUILD_NUM}>) \n   \
@@ -226,7 +227,7 @@ jobs:
                                         *linux-x64:* https://s3.console.aws.amazon.com/s3/object/polarityio-dev-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-linux-x64.tgz \n\
                                         *darwin-x64:* https://s3.console.aws.amazon.com/s3/object/polarityio-dev-builds/qtsingleapplication/${BUILD_VERSION}/qtsingleapplication-${BUILD_VERSION}-darwin-x64.tgz  \n\
                                       \", \
-                                      \"icon_emoji\": \":penguin-fugue:\" }" https://hooks.slack.com/services/${PX_SLACK_WEBHOOK}
+                                      \"icon_emoji\": \":linux:\" }"
 
 workflows:
     build-release:
@@ -251,6 +252,7 @@ workflows:
                   context:
                       - glados
                       - circleci-aws-dev
+                      - px-slackbot
                   requires:
                       - build-linux
                       - build-win
