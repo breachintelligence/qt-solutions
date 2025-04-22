@@ -48,7 +48,7 @@ jobs:
                   command: |
                       export PATH=$PWD/Qt/6.2.4/macos/bin:$PATH
                       cd qtsingleapplication/buildlib
-                      qmake CONFIG+=x86_64
+                      qmake "QMAKE_APPLE_DEVICE_ARCHS=x86_64"
                       make -j2 ARCH_FLAG="-target x86_64-apple-macos13.0"
             - run:
                   command: |
